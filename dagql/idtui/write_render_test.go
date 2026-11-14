@@ -177,7 +177,7 @@ func TestConversationReportRendersWrite(t *testing.T) {
 	fe.profile = termenv.Ascii
 	report := func() string {
 		var buf strings.Builder
-		fe.renderMessageLogs(NewOutput(&buf, termenv.WithProfile(termenv.Ascii)), db.Spans.Map[toolID], 0)
+		fe.renderMessageLogs(NewOutput(&buf, termenv.WithProfile(termenv.Ascii)), db.Spans.Map[toolID], 0, false)
 		return buf.String()
 	}
 	got := report()
@@ -196,8 +196,9 @@ func TestConversationReportRendersWrite(t *testing.T) {
 // its arguments, at a verbosity that shows tool calls' JSON arguments: its
 // header names the file once its path is whole, and its contents grow
 // beneath it as code, each line highlighted once it's whole, in place of
-// its JSON arguments. Once it ends, its result shows beneath them, and its
-// header and body are what they were.
+// its JSON arguments. Once it ends, its header and body are what they were,
+// and its result, which the body already shows, shows beneath it once the
+// row is expanded.
 func TestStreamingWriteRendersItsContents(t *testing.T) {
 	// Never hold a highlight back for being too soon after the last.
 	now := time.Unix(0, 0)
@@ -257,10 +258,14 @@ func TestStreamingWriteRendersItsContents(t *testing.T) {
 	require.Contains(t, got, "• editor Write tmp/stream-test.go", got)
 	require.Contains(t, lineWith(got, "editor Write"), "42.0s", got)
 	require.Contains(t, got, "6 │ }", got)
-	require.Contains(t, got, "tmp/stream-test.go +6", got)
-	require.Less(t, strings.Index(got, "6 │ }"), strings.Index(got, "tmp/stream-test.go +6"),
-		"result beneath the body:\n%s", got)
+	require.NotContains(t, got, "tmp/stream-test.go +6", "collapsed, the body is the result:\n%s", got)
 	require.True(t, containsStyledLine(frame, "package stream", goKeyword()+"package"), visibleEscapes(frame))
 	require.NotContains(t, got, `{"filePath"`, got)
 	require.Empty(t, l.fe.codeStreams)
+
+	l.expand(liveTimeout)
+	got = stripANSICodes(l.frame())
+	require.Contains(t, got, "tmp/stream-test.go +6", got)
+	require.Less(t, strings.Index(got, "6 │ }"), strings.Index(got, "tmp/stream-test.go +6"),
+		"result beneath the body:\n%s", got)
 }

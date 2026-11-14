@@ -527,7 +527,7 @@ func TestConversationReportRendersDangSource(t *testing.T) {
 	fe.logs.ToolArgs[toolID] = args
 
 	var buf strings.Builder
-	fe.renderMessageLogs(NewOutput(&buf, termenv.WithProfile(termenv.Ascii)), db.Spans.Map[toolID], 0)
+	fe.renderMessageLogs(NewOutput(&buf, termenv.WithProfile(termenv.Ascii)), db.Spans.Map[toolID], 0, false)
 	got := buf.String()
 	assert.Contains(t, got, " 1 │ print(0)\n")
 	assert.Contains(t, got, "20 │ print(19)\n")

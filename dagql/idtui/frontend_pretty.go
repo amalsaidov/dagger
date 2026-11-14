@@ -786,7 +786,11 @@ func (s *SpanTreeView) renderRowExtras(ctx tuist.Context, r *renderer, row *dagu
 		testsExclude.commit()
 	}
 
+	// Whether the row rolls up what it ran: a tool call's raw result, which
+	// reports the same, then stays out of its collapsed row.
+	var rolledUp bool
 	if inlineTests := s.renderInlineTests(ctx, r, row, testsExclude); len(inlineTests) > 0 {
+		rolledUp = true
 		s.selfLineCount += len(inlineTests)
 		ctx.Lines(inlineTests...)
 	}
@@ -795,23 +799,26 @@ func (s *SpanTreeView) renderRowExtras(ctx tuist.Context, r *renderer, row *dagu
 		inlineChecks = s.renderInlineChecks(ctx, r, row)
 	}
 	if len(inlineChecks) > 0 {
+		rolledUp = true
 		s.selfLineCount += len(inlineChecks)
 		ctx.Lines(inlineChecks...)
 	}
 
 	if inlineGenerators := s.renderInlineGenerators(ctx, r, row); len(inlineGenerators) > 0 {
+		rolledUp = true
 		s.selfLineCount += len(inlineGenerators)
 		ctx.Lines(inlineGenerators...)
 	}
 
 	if inlineServices := s.renderInlineServices(ctx, r, row); len(inlineServices) > 0 {
+		rolledUp = true
 		s.selfLineCount += len(inlineServices)
 		ctx.Lines(inlineServices...)
 	}
 
 	// Render this row's own inline logs via its memoized LogsView child, so the
 	// expensive Vterm.View() is skipped on unrelated parent repaints.
-	if inlineLogs := s.renderInlineLogs(ctx, r, row, visualFocused); len(inlineLogs) > 0 {
+	if inlineLogs := s.renderInlineLogs(ctx, r, row, visualFocused, rolledUp); len(inlineLogs) > 0 {
 		s.selfLineCount += len(inlineLogs)
 		ctx.Lines(inlineLogs...)
 	}

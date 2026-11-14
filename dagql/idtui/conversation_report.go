@@ -81,12 +81,45 @@ func (fe *frontendPretty) renderMessageNode(ctx tuist.Context, out TermOutput, r
 	// no longer has any of them.
 	superseded := fe.db.SupersededBy(node.Span) != nil
 
+	// A Timeout's row presents as the call it runs (its nested call is left
+	// out below), so what that call ran -- checks, tests, generators,
+	// services, beneath its own boundary -- rolls up here.
+	wrapped := fe.db.WrappedCallSpan(node.Span)
+	rollupSpan := node.Span
+	if wrapped != nil {
+		rollupSpan = wrapped
+	}
+
+	// The rollups print beneath the call's output, but render first: a call
+	// whose rollups report what it ran leaves its raw result out (see
+	// hidesToolResult). The checks rollup nests each check's tests, so render
+	// it first under forked claims; the TESTS rollup then covers only the
+	// cases it left out.
+	var rollups [][]string
+	rolledUp := false
+	if !superseded {
+		var checks []string
+		checkClaims := fe.withForkedClaims(func() {
+			checks = indentLines("  ", fe.renderMessageChecks(ctx, r, rollupSpan))
+		})
+		checkClaims.commit()
+		rollups = [][]string{
+			fe.renderMessageTests(ctx, rollupSpan, len(indent), checkClaims),
+			checks,
+			indentLines("  ", fe.renderMessageGenerators(ctx, r, rollupSpan)),
+			indentLines("  ", fe.renderMessageServices(ctx, r, rollupSpan)),
+		}
+		for _, rollup := range rollups {
+			rolledUp = rolledUp || len(rollup) > 0
+		}
+	}
+
 	// Prompt/thinking/response spans (Message != "") render their content via
 	// renderStep -> renderStepLogs. Tool-call display spans carry their arguments
 	// and rolled-up execution output as logs with no Message, so render those
 	// explicitly here (the same log block a failed check's cause uses).
 	if node.Span.Message == "" && !superseded {
-		fe.renderMessageLogs(rowOut, node.Span, fe.contentWidth-len(indent))
+		fe.renderMessageLogs(rowOut, node.Span, fe.contentWidth-len(indent), rolledUp)
 	}
 
 	for _, line := range strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n") {
@@ -100,28 +133,7 @@ func (fe *frontendPretty) renderMessageNode(ctx tuist.Context, out TermOutput, r
 		return
 	}
 
-	// A Timeout's row presents as the call it runs (its nested call is left
-	// out below), so what that call ran -- checks, tests, generators,
-	// services, beneath its own boundary -- rolls up here.
-	wrapped := fe.db.WrappedCallSpan(node.Span)
-	rollupSpan := node.Span
-	if wrapped != nil {
-		rollupSpan = wrapped
-	}
-
-	// The checks rollup nests each check's tests, so render it first under
-	// forked claims; the TESTS rollup then covers only the cases it left out.
-	var checks []string
-	checkClaims := fe.withForkedClaims(func() {
-		checks = indentLines("  ", fe.renderMessageChecks(ctx, r, rollupSpan))
-	})
-	checkClaims.commit()
-	for _, rollup := range [][]string{
-		fe.renderMessageTests(ctx, rollupSpan, len(indent), checkClaims),
-		checks,
-		indentLines("  ", fe.renderMessageGenerators(ctx, r, rollupSpan)),
-		indentLines("  ", fe.renderMessageServices(ctx, r, rollupSpan)),
-	} {
+	for _, rollup := range rollups {
 		if len(rollup) == 0 {
 			continue
 		}
@@ -247,14 +259,15 @@ func (fe *frontendPretty) indentMessageNodeLogs(span *dagui.Span, width int) {
 
 // renderMessageLogs renders a tool-call node's arguments at verbose levels (or
 // its code body, see toolCodeBody) and, beneath them, the result (or error)
-// the LLM saw. Read and Grep keep their regular result bodies collapsed;
+// the LLM saw -- unless a richer rendering of it shows instead, as a collapsed
+// live row has it (see hidesToolResult; rolledUp: its rollups render below).
 // Grep's final summary line is in the header. The arguments are the
 // tool-call display span's application/json records; the output is on that
 // span or on the nested execution span. Cloud's descendant roll-up doesn't
 // return nested execution output here (it crosses the tool call's
 // RollUpLogs boundary), so the report fetches the exec span's own logs
 // directly (recalculateViewLocked).
-func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, width int) {
+func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, width int, rolledUp bool) {
 	// A Dang snippet is the call, as Write's contents are: show it as code,
 	// in place of its JSON arguments, lined up under the call as the live
 	// row has it. A snippet shows in full; a written file, which can run to
@@ -275,7 +288,7 @@ func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, wi
 	} else if fe.spanVerbosity(span) >= toolArgsVerbosity {
 		fe.renderSpanLogBlock(out, span, span, 0, true)
 	}
-	if fe.db.CollapsesToolOutput(span) {
+	if fe.hidesToolResult(span, rolledUp) {
 		return
 	}
 	fe.renderSpanLogBlock(out, span, span, 0, false)
