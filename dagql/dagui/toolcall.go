@@ -92,6 +92,11 @@ func (db *DB) ingestToolArgs(record sdklog.Record, spanID SpanID, body string) {
 		args.chunks, args.size = nil, 0
 		args.overflowed = true
 	}
+	if span.Received {
+		// Records can arrive after their call ended: kept only while
+		// they're cut short (see pruneToolArgs).
+		db.pruneToolArgs(span)
+	}
 	db.update(span)
 }
 

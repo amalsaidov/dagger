@@ -174,6 +174,15 @@ func TestToolArgsFreedWhenCallEnds(t *testing.T) {
 	file, ok := view.WriteFile()
 	require.True(t, ok)
 	assert.Equal(t, "hel", file.Contents)
+
+	// Records that arrive after their call ended -- replayed, read on
+	// demand, or the last batch landing late -- aren't kept once whole.
+	late := h.call(4, "committer", "log")
+	endWith(late, codes.Ok)
+	h.stream(late, `{"limit":`)
+	assert.Contains(t, h.db.toolArgsJSON, late.ID, "cut short: kept")
+	h.stream(late, `5}`+"\n")
+	assert.NotContains(t, h.db.toolArgsJSON, late.ID)
 }
 
 func TestWriteFile(t *testing.T) {
