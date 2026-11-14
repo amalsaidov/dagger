@@ -137,6 +137,9 @@ func (fe *frontendPretty) searchNameMatches(query string) []*dagui.Span {
 // If no match is selected (searchIdx == -1), seeks forward from focus.
 // Returns true if a match was navigated to.
 func (fe *frontendPretty) searchNext() bool {
+	// A render may have laid a log out again since the matches were
+	// gathered, moving their rows.
+	fe.refreshSearchMatches()
 	if len(fe.searchMatches) == 0 {
 		return false
 	}
@@ -157,6 +160,7 @@ func (fe *frontendPretty) searchNext() bool {
 // If no match is selected (searchIdx == -1), seeks backward from focus.
 // Returns true if a match was navigated to.
 func (fe *frontendPretty) searchPrev() bool {
+	fe.refreshSearchMatches()
 	if len(fe.searchMatches) == 0 {
 		return false
 	}
@@ -196,6 +200,17 @@ func (fe *frontendPretty) refreshSearchMatches() {
 
 	// Try to preserve the current match position.
 	if oldMatch != (searchMatch{}) {
+		// A log laid out again at a new width moves its rows: its vterm
+		// knows the row its current match is on now.
+		if oldMatch.logRow >= 0 {
+			logs := fe.logs.Logs[oldMatch.spanID]
+			if oldMatch.toolArgs {
+				logs = fe.logs.ToolArgs[oldMatch.spanID]
+			}
+			if logs != nil && logs.SearchCurrentRow >= 0 {
+				oldMatch.logRow = logs.SearchCurrentRow
+			}
+		}
 		fe.searchIdx = 0
 		for i, m := range fe.searchMatches {
 			if m == oldMatch {
