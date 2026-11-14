@@ -3,6 +3,7 @@ package idtui
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -151,8 +152,45 @@ func TestWriteToolCallTranscript(t *testing.T) {
 }
 
 // liveWriteArgs are a Write's arguments in the order models write them, the
-// order its schema offers them in.
+// order its schema offers them in: the order Write declares them in.
 const liveWriteArgs = `{"filePath":"tmp/stream-test.go","contents":"package stream\n\n// Greet greets.\nfunc Greet() string {\n\treturn \"hi\"\n}\n"}`
+
+// TestConversationReportRendersWrite covers the final report: a Write shows
+// its file collapsed, as its live row does, unless the report shows tool
+// calls' arguments; then, all of it.
+func TestConversationReportRendersWrite(t *testing.T) {
+	db := dagui.NewDB()
+	toolID := prettyTestSpanID(2)
+	start := time.Unix(100, 0)
+	var long []string
+	for i := range 40 {
+		long = append(long, fmt.Sprintf("line %d", i+1))
+	}
+	db.ImportSnapshots([]dagui.SpanSnapshot{{
+		ID: toolID, TraceID: prettyTestTraceID(), Name: "editor_write",
+		LLMRole: "assistant", LLMTool: "write", LLMToolServer: "editor",
+		LLMToolArgNames:  []string{"filePath", "contents"},
+		LLMToolArgValues: []string{"notes.dang", strings.Join(long, "\n")},
+		StartTime:        start, EndTime: start.Add(time.Second), Final: true,
+	}})
+	fe := NewWithDB(io.Discard, db)
+	fe.profile = termenv.Ascii
+	report := func() string {
+		var buf strings.Builder
+		fe.renderMessageLogs(NewOutput(&buf, termenv.WithProfile(termenv.Ascii)), db.Spans.Map[toolID], 0)
+		return buf.String()
+	}
+	got := report()
+	assert.Contains(t, got, "16 │ line 16\n")
+	assert.NotContains(t, got, "line 17")
+	assert.Contains(t, got, "┆ … 24 more lines")
+
+	fe.FrontendOpts.Verbosity = toolArgsVerbosity
+	got = report()
+	assert.Contains(t, got, "40 │ line 40\n")
+	assert.NotContains(t, got, "more lines")
+	assert.NotContains(t, got, `{"filePath"`)
+}
 
 // TestStreamingWriteRendersItsContents covers a Write while the model writes
 // its arguments, at a verbosity that shows tool calls' JSON arguments: its

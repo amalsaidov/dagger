@@ -100,10 +100,11 @@ func firstLineOf(s string) string {
 const codeBodyCollapsedLines = 16
 
 // codeBody is code a tool call shows as its body: a Dang snippet's source,
-// or the contents Write writes, and how it's highlighted.
+// or the contents Write writes (file), and how it's highlighted.
 type codeBody struct {
 	source string
 	lang   codeLang
+	file   bool
 }
 
 // toolCodeBody returns the code a tool-call span shows as its body, in place
@@ -117,7 +118,7 @@ func (fe *frontendPretty) toolCodeBody(span *dagui.Span) (body codeBody, streami
 	if snippet, isDang := view.DangSnippet(); isDang {
 		body = codeBody{source: snippet.Source, lang: dangCode}
 	} else if file, isWrite := view.WriteFile(); isWrite {
-		body = codeBody{source: file.Contents, lang: codeLangForPath(file.Path)}
+		body = codeBody{source: file.Contents, lang: codeLangForPath(file.Path), file: true}
 	} else {
 		return codeBody{}, false, false
 	}
