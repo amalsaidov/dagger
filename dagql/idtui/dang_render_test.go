@@ -599,7 +599,8 @@ func TestStreamingDangHighlight(t *testing.T) {
 }
 
 // TestConversationReportRendersDangSource covers the final report: a Dang
-// call shows its whole snippet as code, in place of its JSON arguments.
+// call shows its whole snippet as code, and, where the report shows tool
+// calls' arguments, its JSON arguments beneath.
 func TestConversationReportRendersDangSource(t *testing.T) {
 	db := dagui.NewDB()
 	toolID := prettyTestSpanID(2)
@@ -628,5 +629,6 @@ func TestConversationReportRendersDangSource(t *testing.T) {
 	assert.Contains(t, got, " 1 │ print(0)\n")
 	assert.Contains(t, got, "20 │ print(19)\n")
 	assert.NotContains(t, got, "more lines")
-	assert.NotContains(t, got, `{"source"`)
+	// It shows tool calls' arguments: the JSON follows the snippet.
+	assert.Less(t, strings.Index(got, "20 │ print(19)"), strings.Index(got, `{"source":"print(0)"}`), got)
 }

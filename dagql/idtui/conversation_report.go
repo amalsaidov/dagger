@@ -257,23 +257,23 @@ func (fe *frontendPretty) indentMessageNodeLogs(span *dagui.Span, width int) {
 	}
 }
 
-// renderMessageLogs renders a tool-call node's arguments at verbose levels (or
-// its code body, see toolCodeBody) and, beneath them, the result (or error)
-// the LLM saw -- unless a richer rendering of it shows instead, as a collapsed
-// live row has it (see hidesToolResult; rolledUp: its rollups render below).
-// Grep's final summary line is in the header. The arguments are the
-// tool-call display span's application/json records; the output is on that
-// span or on the nested execution span. Cloud's descendant roll-up doesn't
-// return nested execution output here (it crosses the tool call's
+// renderMessageLogs renders a tool-call node's code body (see toolCodeBody),
+// its JSON arguments at verbose levels, and, beneath them, the result (or
+// error) the LLM saw -- unless a richer rendering of it shows instead, as a
+// collapsed live row has it (see hidesToolResult; rolledUp: its rollups
+// render below). Grep's final summary line is in the header. The arguments
+// are the tool-call display span's application/json records; the output is
+// on that span or on the nested execution span. Cloud's descendant roll-up
+// doesn't return nested execution output here (it crosses the tool call's
 // RollUpLogs boundary), so the report fetches the exec span's own logs
 // directly (recalculateViewLocked).
 func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, width int, rolledUp bool) {
 	// A Dang snippet is the call, as Write's contents are: show it as code,
-	// in place of its JSON arguments, lined up under the call as the live
-	// row has it. A snippet shows in full; a written file, which can run to
-	// thousands of lines, as a collapsed row shows it, and a DangCheck not
-	// at all, its header saying what it checks -- unless the report shows
-	// tool calls' arguments.
+	// lined up under the call as the live row has it. A snippet shows in
+	// full; a written file, which can run to thousands of lines, as a
+	// collapsed row shows it, and a DangCheck not at all, its header saying
+	// what it checks -- unless the report shows tool calls' arguments, which
+	// then follow, as the model wrote them, for every call.
 	indent := ""
 	if fe.shellTranscript() && span.LLMTool != "" {
 		indent = "  "
@@ -289,7 +289,8 @@ func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, wi
 				fmt.Fprintln(out, indent+line)
 			}
 		}
-	} else if verbose {
+	}
+	if verbose {
 		fe.renderSpanLogBlock(out, span, span, 0, true)
 	}
 	if fe.hidesToolResult(span, rolledUp) {

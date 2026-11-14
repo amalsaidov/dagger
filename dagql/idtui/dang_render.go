@@ -135,9 +135,9 @@ type codeBody struct {
 	check  bool
 }
 
-// toolCodeBody returns the code a tool-call span shows as its body, in place
-// of its JSON arguments, if it is a call that has one -- even before any of
-// it has arrived -- and whether it's still streaming in.
+// toolCodeBody returns the code a tool-call span shows as its body, if it is
+// a call that has one -- even before any of it has arrived -- and whether
+// it's still streaming in.
 func (fe *frontendPretty) toolCodeBody(span *dagui.Span) (body codeBody, streaming, ok bool) {
 	if !isToolCallDisplay(span) || !dagui.RendersToolArgs(span.LLMTool) {
 		return codeBody{}, false, false
@@ -151,13 +151,6 @@ func (fe *frontendPretty) toolCodeBody(span *dagui.Span) (body codeBody, streami
 		return codeBody{}, false, false
 	}
 	return body, view.Streaming, true
-}
-
-// hasToolBody reports whether a tool-call span shows a code body (see
-// toolCodeBody) in place of its JSON arguments.
-func (fe *frontendPretty) hasToolBody(span *dagui.Span) bool {
-	_, _, ok := fe.toolCodeBody(span)
-	return ok
 }
 
 // toolBodyRows renders a tool-call row's code body (toolBodyLines) beneath

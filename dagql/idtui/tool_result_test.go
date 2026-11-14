@@ -38,6 +38,43 @@ func (l *liveToolCalls) failToolCall(id, parent byte, name string, attrs []attri
 	require.NoError(l.t, l.fe.SpanExporter().ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{stub.Snapshot()}))
 }
 
+// TestToolArgsShowAtHighVerbosity covers a tool call's raw JSON arguments:
+// at toolArgsVerbosity every call shows them, those rendered richer too --
+// beneath their code body -- and at the default verbosity none does.
+func TestToolArgsShowAtHighVerbosity(t *testing.T) {
+	for _, c := range []struct {
+		name, tool, args, body string
+	}{
+		{"dang eval", "DangEval", `{"source":"1 + 1"}`, "1 │ 1 + 1"},
+		{"dang check", "DangCheck", `{"source":"ws"}`, ""},
+		{"timeout", "Timeout", `{"tool":"DangEval","duration":"5m","arguments":{"source":"2 + 2"}}`, "1 │ 2 + 2"},
+		{"write", "write", `{"filePath":"a.txt","contents":"hello\n"}`, "1 │ hello"},
+		{"read", "read", `{"path":"main.go"}`, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			for _, verbosity := range []int{dagui.ShowCompletedVerbosity, toolArgsVerbosity} {
+				l := newLiveToolCalls(t, termenv.Ascii)
+				l.fe.FrontendOpts.Verbosity = verbosity
+				l.toolCall(liveTimeout, liveReply, c.tool)
+				l.stream(liveTimeout, c.args, 1<<10, nil)
+				l.closeArgs(liveTimeout)
+				l.fe.viewDirty = true
+				got := stripANSICodes(l.frame())
+				args := strings.Index(got, c.args[:12])
+				if verbosity < toolArgsVerbosity {
+					assert.Equal(t, -1, args, "verbosity %d showed JSON arguments:\n%s", verbosity, got)
+					continue
+				}
+				require.GreaterOrEqual(t, args, 0, "verbosity %d hid JSON arguments:\n%s", verbosity, got)
+				if c.body != "" {
+					assert.Less(t, strings.Index(got, c.body), args, "the body first:\n%s", got)
+					assert.GreaterOrEqual(t, strings.Index(got, c.body), 0, got)
+				}
+			}
+		})
+	}
+}
+
 // expand expands a row as its toggle key does.
 func (l *liveToolCalls) expand(id byte) {
 	l.fe.setExpanded(prettyTestSpanID(id), true)
