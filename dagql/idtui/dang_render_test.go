@@ -290,6 +290,25 @@ func TestDangCheckRow(t *testing.T) {
 	}
 }
 
+// TestDangCheckStatus covers reading a DangCheck's status off its report's
+// footer: after the nudge that can follow it, and wider than the log's rows,
+// which a long module scope makes it.
+func TestDangCheckStatus(t *testing.T) {
+	const footer = "1 error · module helper (github.com/acme/widgets/tools@main) · 1 file · nothing ran\n"
+	for _, width := range []int{200, 80, 60, 30} {
+		logs := NewVterm(termenv.Ascii)
+		logs.SetWidth(width)
+		_, _ = logs.Write([]byte("<check>:1:1: error: nope\n" + footer + dangNudgeForTest))
+		assert.Equal(t, "1 error", dangCheckStatus(logs), "at %d", width)
+	}
+	logs := NewVterm(termenv.Ascii)
+	_, _ = logs.Write([]byte("[String!]!\nok · workspace scope · nothing ran\n"))
+	assert.Equal(t, "ok", dangCheckStatus(logs))
+	logs = NewVterm(termenv.Ascii)
+	_, _ = logs.Write([]byte("no footer here\n"))
+	assert.Equal(t, "", dangCheckStatus(logs))
+}
+
 const dangNudgeForTest = "See the dang-language skill (ReadSkill) for Dang's syntax and semantics.\n"
 
 func TestTimeoutToolCallTranscript(t *testing.T) {

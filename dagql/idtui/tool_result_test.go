@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/dagger/dagger/dagql/dagui"
+	"github.com/dagger/dagger/engine/telemetryattrs"
 )
 
 // failToolCall ends a tool call's display span as endToolCallDisplay does
@@ -130,11 +131,39 @@ func TestRichToolCallsHideTheirResult(t *testing.T) {
 		assert.NotContains(t, collapsed, "RAW CHECK REPORT", collapsed)
 		assert.Contains(t, expanded, "RAW CHECK REPORT", expanded)
 
-		// The final report leaves it out too.
+		// The final report leaves it out too, unless it shows tool calls'
+		// arguments: it can't be expanded.
+		report := func() string {
+			r := newRenderer(l.fe.db, 0, l.fe.FrontendOpts, true)
+			return stripANSICodes(strings.Join(l.fe.conversationReport(tuist.Context{Width: 100}, r, false), "\n"))
+		}
+		got := report()
+		assert.Contains(t, got, "CHECKS", got)
+		assert.NotContains(t, got, "RAW CHECK REPORT", got)
+		l.fe.FrontendOpts.Verbosity = toolArgsVerbosity
+		got = report()
+		assert.Contains(t, got, "RAW CHECK REPORT", got)
+	})
+
+	t.Run("services", func(t *testing.T) {
+		// A SERVICES rollup says what's running, not what the call
+		// returned of it: its endpoint, say.
+		l := newLiveToolCalls(t, termenv.Ascii)
+		attrs := l.moduleToolCall(liveTimeout, liveReply, "engineLab", "start")
+		l.closeArgs(liveTimeout)
+		l.span(liveWork, liveTimeout, "exec dagger engine",
+			attribute.Bool(telemetryattrs.ServiceAttr, true),
+			attribute.String(telemetryattrs.ServiceNameAttr, "engine.dagger.local"))
+		result(l, liveTimeout, "ENDPOINT tcp://engine.dagger.local:1234")
+		l.endToolCall(liveTimeout, liveReply, "engineLab_start", attrs, nil, nil)
+		l.fe.viewDirty = true
+		collapsed := stripANSICodes(l.frame())
+		assert.Contains(t, collapsed, "SERVICES", collapsed)
+		assert.Contains(t, collapsed, "ENDPOINT tcp://engine.dagger.local:1234", collapsed)
+
 		r := newRenderer(l.fe.db, 0, l.fe.FrontendOpts, true)
 		report := stripANSICodes(strings.Join(l.fe.conversationReport(tuist.Context{Width: 100}, r, false), "\n"))
-		assert.Contains(t, report, "CHECKS", report)
-		assert.NotContains(t, report, "RAW CHECK REPORT", report)
+		assert.Contains(t, report, "ENDPOINT tcp://engine.dagger.local:1234", report)
 	})
 
 	t.Run("a check that failed", func(t *testing.T) {
@@ -182,4 +211,3 @@ func TestRichToolCallsHideTheirResult(t *testing.T) {
 		assert.Contains(t, collapsed, `String! = "HI!"`, collapsed)
 	})
 }
-

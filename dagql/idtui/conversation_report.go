@@ -107,11 +107,12 @@ func (fe *frontendPretty) renderMessageNode(ctx tuist.Context, out TermOutput, r
 			fe.renderMessageTests(ctx, rollupSpan, len(indent), checkClaims),
 			checks,
 			indentLines("  ", fe.renderMessageGenerators(ctx, r, rollupSpan)),
-			indentLines("  ", fe.renderMessageServices(ctx, r, rollupSpan)),
 		}
 		for _, rollup := range rollups {
 			rolledUp = rolledUp || len(rollup) > 0
 		}
+		// Services don't count (see renderRowExtras).
+		rollups = append(rollups, indentLines("  ", fe.renderMessageServices(ctx, r, rollupSpan)))
 	}
 
 	// Prompt/thinking/response spans (Message != "") render their content via
@@ -293,7 +294,11 @@ func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, wi
 	if verbose {
 		fe.renderSpanLogBlock(out, span, span, 0, true)
 	}
-	if fe.hidesToolResult(span, rolledUp) {
+	// The report can't expand a row, so where it shows tool calls'
+	// arguments, it shows the results their richer renderings stand in for
+	// too -- a check's diagnostics, what a Write changed -- all but Read's
+	// and Grep's output, which stays out at any verbosity.
+	if fe.hidesToolResult(span, rolledUp) && (!verbose || fe.db.CollapsesToolOutput(span)) {
 		return
 	}
 	fe.renderSpanLogBlock(out, span, span, 0, false)

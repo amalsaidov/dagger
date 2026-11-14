@@ -786,8 +786,10 @@ func (s *SpanTreeView) renderRowExtras(ctx tuist.Context, r *renderer, row *dagu
 		testsExclude.commit()
 	}
 
-	// Whether the row rolls up what it ran: a tool call's raw result, which
-	// reports the same, then stays out of its collapsed row.
+	// Whether the row rolls up what it ran -- its checks, tests or
+	// generators: a tool call's raw result, which reports the same, then
+	// stays out of its collapsed row. A SERVICES rollup doesn't: what a call
+	// returns of the services it started (an endpoint, say) isn't in it.
 	var rolledUp bool
 	if inlineTests := s.renderInlineTests(ctx, r, row, testsExclude); len(inlineTests) > 0 {
 		rolledUp = true
@@ -811,7 +813,6 @@ func (s *SpanTreeView) renderRowExtras(ctx tuist.Context, r *renderer, row *dagu
 	}
 
 	if inlineServices := s.renderInlineServices(ctx, r, row); len(inlineServices) > 0 {
-		rolledUp = true
 		s.selfLineCount += len(inlineServices)
 		ctx.Lines(inlineServices...)
 	}
@@ -8776,9 +8777,10 @@ func renderDangCheckStatus(out TermOutput, logs *Vterm) {
 // dangCheckStatus returns the status a DangCheck's report ends with: its
 // footer's first field, "ok", "1 error" or "2 errors, 1 warning". The footer
 // is among the report's last lines (a nudge to read the Dang skill can
-// follow it); "" when there's none.
+// follow it), read as written: a footer naming a long scope can be wider
+// than the log's rows. "" when there's none.
 func dangCheckStatus(logs *Vterm) string {
-	lines, _ := logs.PrintTail(4)
+	lines := logs.RawTail(4)
 	for i := len(lines) - 1; i >= 0; i-- {
 		fields := strings.Split(strings.TrimSpace(lines[i]), " · ")
 		if len(fields) >= 2 && fields[len(fields)-1] == "nothing ran" {

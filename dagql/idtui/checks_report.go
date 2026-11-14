@@ -449,7 +449,9 @@ func (fe *frontendPretty) framesRollups() bool {
 // fitFramedLogs lays logs a rollup body shows out at the body's width
 // (ctx's) where rollups are framed (framesRollups), so they fit beside the
 // frame, and returns a func restoring the width they had: the logs are a
-// span's own, which its row in the tree lays out at the screen's.
+// span's own, which its row in the tree sizes to the screen's. Widening
+// keeps the rows the rollup wrapped them into (see Vterm.resizeScreen), so
+// that row shows them a little narrower than it could, but whole.
 func (fe *frontendPretty) fitFramedLogs(ctx tuist.Context, logs *Vterm) (restore func()) {
 	if !fe.framesRollups() || ctx.Width <= 0 {
 		return func() {}

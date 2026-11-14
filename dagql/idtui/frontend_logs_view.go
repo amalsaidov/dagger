@@ -132,8 +132,8 @@ func isToolCallDisplay(span *dagui.Span) bool {
 // because the row already renders it, richer: Read's and Grep's header (see
 // DB.CollapsesToolOutput), a DangCheck's, with its status (see
 // renderToolOutputSummary), the file a Write wrote, as its code body, or,
-// rolledUp, rollups of what the call ran (its CHECKS, TESTS, GENERATORS or
-// SERVICES). Expanding the row shows it. A call that errored always shows
+// rolledUp, rollups of what the call ran (its CHECKS, TESTS or GENERATORS).
+// Expanding the row shows it. A call that errored always shows
 // it, and so does a DangEval: its body is the snippet, and its result the
 // value nothing else shows.
 func (fe *frontendPretty) hidesToolResult(span *dagui.Span, rolledUp bool) bool {
