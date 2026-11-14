@@ -130,7 +130,8 @@ func isToolCallDisplay(span *dagui.Span) bool {
 // hidesToolResult reports whether a tool call leaves its raw result -- the
 // logs on its span, as the model received them -- out of its collapsed row,
 // because the row already renders it, richer: Read's and Grep's header (see
-// DB.CollapsesToolOutput), the file a Write wrote, as its code body, or,
+// DB.CollapsesToolOutput), a DangCheck's, with its status (see
+// renderToolOutputSummary), the file a Write wrote, as its code body, or,
 // rolledUp, rollups of what the call ran (its CHECKS, TESTS, GENERATORS or
 // SERVICES). Expanding the row shows it. A call that errored always shows
 // it, and so does a DangEval: its body is the snippet, and its result the
@@ -143,8 +144,8 @@ func (fe *frontendPretty) hidesToolResult(span *dagui.Span, rolledUp bool) bool 
 		return true
 	}
 	view := fe.db.ToolCallView(span)
-	if dagui.ToolNameIs(view.Tool, "DangEval") {
-		return false
+	if snippet, isDang := view.DangSnippet(); isDang {
+		return snippet.Check
 	}
 	if file, isWrite := view.WriteFile(); isWrite && strings.TrimSpace(file.Contents) != "" {
 		return true

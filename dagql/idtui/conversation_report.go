@@ -271,21 +271,25 @@ func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, wi
 	// A Dang snippet is the call, as Write's contents are: show it as code,
 	// in place of its JSON arguments, lined up under the call as the live
 	// row has it. A snippet shows in full; a written file, which can run to
-	// thousands of lines, as a collapsed row shows it, unless the report
-	// shows tool calls' arguments.
+	// thousands of lines, as a collapsed row shows it, and a DangCheck not
+	// at all, its header saying what it checks -- unless the report shows
+	// tool calls' arguments.
 	indent := ""
 	if fe.shellTranscript() && span.LLMTool != "" {
 		indent = "  "
 	}
+	verbose := fe.spanVerbosity(span) >= toolArgsVerbosity
 	if body, _, ok := fe.toolCodeBody(span); ok {
-		maxLines := 0
-		if body.file && fe.spanVerbosity(span) < toolArgsVerbosity {
-			maxLines = codeBodyCollapsedLines
+		if !body.check || verbose {
+			maxLines := 0
+			if body.file && !verbose {
+				maxLines = codeBodyCollapsedLines
+			}
+			for _, line := range fe.toolBodyLines(span, width-len(indent), maxLines, true) {
+				fmt.Fprintln(out, indent+line)
+			}
 		}
-		for _, line := range fe.toolBodyLines(span, width-len(indent), maxLines, true) {
-			fmt.Fprintln(out, indent+line)
-		}
-	} else if fe.spanVerbosity(span) >= toolArgsVerbosity {
+	} else if verbose {
 		fe.renderSpanLogBlock(out, span, span, 0, true)
 	}
 	if fe.hidesToolResult(span, rolledUp) {

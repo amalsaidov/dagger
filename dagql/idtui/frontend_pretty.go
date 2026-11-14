@@ -8735,7 +8735,9 @@ func (fe *frontendPretty) renderToolOutputSummary(out TermOutput, span *dagui.Sp
 		// a Timeout summarizes as the call it wraps
 		tool = fe.db.ToolCallView(span).Tool
 	}
-	if !dagui.ToolNameIs(tool, "grep") {
+	grep := dagui.ToolNameIs(tool, "grep")
+	dangCheck := dagui.ToolNameIs(tool, "DangCheck")
+	if !grep && !dangCheck {
 		return
 	}
 	logs := fe.logs.Logs[span.ID]
@@ -8745,10 +8747,45 @@ func (fe *frontendPretty) renderToolOutputSummary(out TermOutput, span *dagui.Sp
 	if logs == nil {
 		return
 	}
+	if dangCheck {
+		renderDangCheckStatus(out, logs)
+		return
+	}
 	summary := dagui.SanitizeInline(strings.TrimSpace(ansi.Strip(logs.LastLine())))
 	if summary != "" {
 		fmt.Fprint(out, out.String(" - "+summary).Faint())
 	}
+}
+
+// renderDangCheckStatus renders a DangCheck's status in its header, from its
+// report's footer (e.g. "1 error · workspace scope · nothing ran"), so a
+// check that failed shows while its row is collapsed: its errors in red,
+// else its warnings in yellow. A check that passed says nothing more.
+func renderDangCheckStatus(out TermOutput, logs *Vterm) {
+	status := dangCheckStatus(logs)
+	if status == "" || status == "ok" {
+		return
+	}
+	color := termenv.ANSIYellow
+	if strings.Contains(status, "error") {
+		color = termenv.ANSIRed
+	}
+	fmt.Fprint(out, out.String(" - ").Faint().String()+out.String(dagui.SanitizeInline(status)).Foreground(color).String())
+}
+
+// dangCheckStatus returns the status a DangCheck's report ends with: its
+// footer's first field, "ok", "1 error" or "2 errors, 1 warning". The footer
+// is among the report's last lines (a nudge to read the Dang skill can
+// follow it); "" when there's none.
+func dangCheckStatus(logs *Vterm) string {
+	lines, _ := logs.PrintTail(4)
+	for i := len(lines) - 1; i >= 0; i-- {
+		fields := strings.Split(strings.TrimSpace(lines[i]), " · ")
+		if len(fields) >= 2 && fields[len(fields)-1] == "nothing ran" {
+			return fields[0]
+		}
+	}
+	return ""
 }
 
 func (fe *frontendPretty) renderStepTitle(ctx tuist.Context, out TermOutput, r *renderer, row *dagui.TraceRow, prefix string, statusHost statusIconHost, focused bool, abridged bool) error {
