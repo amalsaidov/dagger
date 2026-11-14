@@ -254,14 +254,15 @@ func (fe *frontendPretty) indentMessageNodeLogs(span *dagui.Span, width int) {
 // RollUpLogs boundary), so the report fetches the exec span's own logs directly
 // (recalculateViewLocked).
 func (fe *frontendPretty) renderMessageLogs(out TermOutput, span *dagui.Span, width int) {
-	// A Dang snippet is the call: show it as code, in full, in place of its
-	// JSON arguments, lined up under the call as the live row has it.
+	// A Dang snippet is the call, as Write's contents are: show it as code,
+	// in full, in place of its JSON arguments, lined up under the call as
+	// the live row has it.
 	indent := ""
 	if fe.shellTranscript() && span.LLMTool != "" {
 		indent = "  "
 	}
-	if source := fe.dangSourceLines(span, width-len(indent), 0, true); len(source) > 0 {
-		for _, line := range source {
+	if fe.hasToolBody(span) {
+		for _, line := range fe.toolBodyLines(span, width-len(indent), 0, true) {
 			fmt.Fprintln(out, indent+line)
 		}
 	} else if fe.spanVerbosity(span) >= toolArgsVerbosity {
